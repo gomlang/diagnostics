@@ -61,3 +61,15 @@ fn suggestion_updates_are_returned_for_application_owned_publication() -> () {
     testing::assert_eq(testing::expect_ok(cache.get(next), "next").text(), "hello world");
     testing::assert_eq(suggestion.applicability, diagnostics::Applicability::MachineApplicable);
 }
+
+#[test]
+fn editor_utf16_range_builds_a_checked_diagnostic_span() -> () {
+    let cache = diagnostics::SourceCache::new();
+    let file = testing::expect_ok(cache.add("editor", "😀old\r\n"), "file");
+    let source = testing::expect_ok(cache.get(file), "source");
+    let start = testing::expect_ok(source.offset_utf16(0, 2), "start");
+    let end = testing::expect_ok(source.offset_utf16(0, 5), "end");
+    let span = testing::expect_ok(source.span(start, end), "span");
+    testing::assert_eq(testing::expect_ok(cache.text(span), "text"), "old");
+    testing::assert_eq(testing::expect_ok(source.utf16_location(end), "position").column, 5);
+}

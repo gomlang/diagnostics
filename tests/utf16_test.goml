@@ -1,0 +1,72 @@
+package tests;
+
+use ecosystem::diagnostics;
+use std::testing;
+
+#[test]
+fn utf16_locations_roundtrip_scalar_positions_and_crlf() -> () {
+    let cache = diagnostics::SourceCache::new();
+    let file = testing::expect_ok(cache.add("editor", "a中😀é\r\n\t👩‍💻\r"), "source");
+    let source = testing::expect_ok(cache.get(file), "source");
+    for (offset, line, column) in[
+        (0, 0, 0),
+        (1, 0, 1),
+        (4, 0, 2),
+        (8, 0, 4),
+        (9, 0, 5),
+        (11, 0, 6),
+        (13, 1, 0),
+        (14, 1, 1),
+        (18, 1, 3),
+        (21, 1, 4),
+        (25, 1, 6),
+        (26, 2, 0),
+    ] {
+        testing::assert_eq(
+            testing::expect_ok(source.utf16_location(offset), "location"),
+            diagnostics::Utf16Location { line, column },
+        );
+        testing::assert_eq(testing::expect_ok(source.offset_utf16(line, column), "offset"), offset);
+    }
+    testing::assert_eq(
+        testing::expect_ok(source.utf16_location(12), "LF inside CRLF"),
+        diagnostics::Utf16Location { line: 0, column: 6 },
+    );
+    for (line, column) in[
+        (-1, 0),
+        (3, 0),
+        (0, -1),
+        (0, 3),
+        (0, 7),
+        (1, 2),
+        (1, 5),
+        (2, 1),
+        (0, 9223372036854775807),
+    ] {
+        testing::assert_eq(
+            testing::expect_err(source.offset_utf16(line, column), "invalid location"),
+            diagnostics::Error::InvalidUtf16Location { line, column },
+        );
+    }
+    testing::assert_eq(
+        testing::expect_err(source.utf16_location(5), "UTF-8 interior"),
+        diagnostics::Error::CharacterBoundary(5),
+    );
+    testing::assert(source.utf16_location(-1).is_err());
+    testing::assert(source.utf16_location(27).is_err());
+}
+
+#[test]
+fn empty_source_has_one_utf16_position() -> () {
+    let cache = diagnostics::SourceCache::new();
+    let source = testing::expect_ok(
+        cache.get(testing::expect_ok(cache.add("empty", ""), "file")),
+        "source",
+    );
+    testing::assert_eq(testing::expect_ok(source.offset_utf16(0, 0), "origin"), 0);
+    testing::assert_eq(
+        testing::expect_ok(source.utf16_location(0), "origin"),
+        diagnostics::Utf16Location { line: 0, column: 0 },
+    );
+    testing::assert(source.offset_utf16(0, 1).is_err());
+}
