@@ -97,7 +97,7 @@ All edit offsets refer to the original snapshots. Nonempty overlapping ranges ar
 (cd ../verification && GOML_BUILD_JOBS=2 just ecosystem-test diagnostics)
 ```
 
-The suite covers 24 library tests and 5 example tests: cache identity, malformed spans, UTF-16 surrogate boundaries, CRLF/CR/EOF, combining and emoji boundaries, tabs, overlapping and multiline labels, exact plain layouts, ANSI equivalence, custom themes, horizontal/vertical clipping, output limits, control injection, edit conflicts, final-size preflight, and immutable source revisions.
+The suite covers 26 library tests and 6 example tests: cache identity, malformed spans, UTF-16 surrogate boundaries, CRLF/CR/EOF, combining and emoji boundaries, tabs, overlapping and multiline labels, exact plain layouts, ANSI equivalence, custom themes, horizontal/vertical clipping, output limits, control injection, edit conflicts, final-size preflight, and immutable source revisions.
 
 The example’s ordinary GoML test replays [independent reference vectors and native render properties](examples/basic/tests/data/README.md) for 6,236 deterministic model checks: 2,976 locations, 1,440 byte spans, 1,500 edit batches, and 320 plain/ANSI rendering checks. No Python runtime is required. The source-position model covers a controlled corpus of independently specified graphemes; the underlying Unicode library owns full Unicode conformance tests. The diagnostics library is not an implementation of Ariadne's API or output format.
 
@@ -112,3 +112,17 @@ goml verify --timeout 300s
 ```
 
 `goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test diagnostics)` also retains the library-specific smoke and compatibility checks.
+
+`source.utf16_index()` builds an immutable `Utf16Index` for repeated editor
+queries. `index.location(byte_offset)` and `index.offset(line, utf16_column)`
+have exactly the same values and errors as `source.utf16_location` and
+`source.offset_utf16`. The index retains the source snapshot, so adding a new
+revision to its cache does not change old positions. It does not mutate the
+source or cache and may be read concurrently after construction.
+
+Construction scans each line once and stores checkpoints every 64 Unicode
+scalars plus line endpoints. Lookup binary-searches the relevant checkpoints
+and decodes at most 64 scalars, avoiding whole-line temporary character vectors
+on repeated queries. Storage is O(lines + scalars/64), in addition to the source;
+the existing source-cache limits bound construction. The original methods remain available for occasional queries without building
+an index.
