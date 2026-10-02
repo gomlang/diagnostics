@@ -13,6 +13,10 @@ pub enum Error {
         length: isize,
     },
     CharacterBoundary(isize),
+    InvalidUtf16Location {
+        line: isize,
+        column: isize,
+    },
     Limit(string),
     ConflictingEdits {
         first: isize,
@@ -28,6 +32,7 @@ impl ToString for Error {
             MissingFile(index) => f"source file {index} is unavailable",
             InvalidSpan { start, end, length } => f"invalid source span {start}..{end} for {length} bytes",
             CharacterBoundary(offset) => f"source offset {offset} splits a UTF-8 scalar",
+            InvalidUtf16Location { line, column } => f"invalid UTF-16 source location {line}:{column}",
             Limit(name) => "diagnostics limit exceeded: " + name,
             ConflictingEdits { first, second } => f"suggestion edits {first} and {second} conflict",
         }
@@ -104,6 +109,12 @@ pub struct Location {
     pub line: isize,
     pub byte_column: isize,
     pub display_column: isize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Utf16Location {
+    pub line: isize,
+    pub column: isize,
 }
 
 pub struct Source {
@@ -234,6 +245,52 @@ impl Source {
             return Result::Err(Error::CharacterBoundary(end));
         }
         Result::Ok(Span { file: self.id, start, end })
+    }
+
+    pub fn utf16_location(self: Source, offset: isize) -> Result[Utf16Location, Error] {
+        self.span(offset, offset)?;
+        let number = line_at(self, offset);
+        let line = self.lines[number];
+        let mut column = 0;
+        for scalar in self.text.byte_slice(line.start, minimum(offset, line.end)).chars() {
+            column += if scalar.to_u32() > 65535 {
+                2
+            } else {
+                1
+            };
+        }
+        Result::Ok(Utf16Location { line: number, column })
+    }
+
+    pub fn offset_utf16(self: Source, line: isize, column: isize) -> Result[isize, Error] {
+        let invalid = Error::InvalidUtf16Location { line, column };
+        if column < 0 {
+            return Result::Err(invalid);
+        }
+        let Some(source_line) = self.line(line) else {
+            return Result::Err(invalid);
+        };
+        let mut used = 0;
+        let mut offset = source_line.start;
+        for scalar in source_line.text.chars() {
+            if used == column {
+                return Result::Ok(offset);
+            }
+            used += if scalar.to_u32() > 65535 {
+                2
+            } else {
+                1
+            };
+            if used > column {
+                return Result::Err(invalid);
+            }
+            offset += scalar.to_string().byte_len();
+        }
+        if used == column {
+            Result::Ok(offset)
+        } else {
+            Result::Err(invalid)
+        }
     }
 
     pub fn location(self: Source, offset: isize, width: unicode_text::WidthOptions, tab_stop: isize) -> Result[
