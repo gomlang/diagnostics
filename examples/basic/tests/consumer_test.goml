@@ -73,3 +73,15 @@ fn editor_utf16_range_builds_a_checked_diagnostic_span() -> () {
     testing::assert_eq(testing::expect_ok(cache.text(span), "text"), "old");
     testing::assert_eq(testing::expect_ok(source.utf16_location(end), "position").column, 5);
 }
+
+#[test]
+fn reusable_editor_index_is_published_without_new_unicode_dependencies() -> () {
+    let cache = diagnostics::SourceCache::new();
+    let source = testing::expect_ok(
+        cache.get(testing::expect_ok(cache.add("editor", "😀old\r\n"), "file")),
+        "source",
+    );
+    let index = source.utf16_index();
+    testing::assert_eq(testing::expect_ok(index.offset(0, 2), "after emoji"), 4);
+    testing::assert_eq(testing::expect_ok(index.location(7), "end").column, 5);
+}

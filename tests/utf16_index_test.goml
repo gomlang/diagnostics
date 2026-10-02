@@ -1,0 +1,62 @@
+package tests;
+
+use ecosystem::diagnostics;
+use std::testing;
+
+#[test]
+fn utf16_index_matches_checked_source_across_checkpoints_and_separators() -> () {
+    let cache = diagnostics::SourceCache::new();
+    let mut text = "";
+    for _ in 0..100 {
+        text += "a中😀é";
+    }
+    text += "\r\n\n\t👩‍💻\r";
+    let source = testing::expect_ok(
+        cache.get(testing::expect_ok(cache.add("indexed", text), "file")),
+        "source",
+    );
+    let index = source.utf16_index();
+    for offset in -1..=text.byte_len() + 1 {
+        testing::assert(index.location(offset) == source.utf16_location(offset));
+    }
+    for line in -1..=source.line_count() {
+        for column in -1..=605 {
+            testing::assert(index.offset(line, column) == source.offset_utf16(line, column));
+        }
+    }
+    testing::assert_eq(testing::expect_ok(index.offset(0, 600), "end of long line"), 1100);
+    testing::assert_eq(
+        testing::expect_ok(index.location(1101), "CRLF clamp"),
+        diagnostics::Utf16Location { line: 0, column: 600 },
+    );
+    testing::assert(index.offset(0, 3).is_err());
+    testing::assert(index.offset(0, 9223372036854775807).is_err());
+    testing::expect_ok(cache.add("indexed", "replacement"), "revision");
+    testing::assert_eq(testing::expect_ok(index.offset(0, 4), "retained snapshot"), 8);
+}
+
+#[test]
+fn utf16_index_handles_empty_and_exact_checkpoint_endpoints() -> () {
+    for count in[0, 1, 63, 64, 65, 128] {
+        let mut text = "";
+        for _ in 0..count {
+            text += "😀";
+        }
+        let cache = diagnostics::SourceCache::new();
+        let source = testing::expect_ok(
+            cache.get(testing::expect_ok(cache.add("points", text), "file")),
+            "source",
+        );
+        let index = source.utf16_index();
+        for at in 0..=count {
+            testing::assert_eq(testing::expect_ok(index.offset(0, at * 2), "offset"), at * 4);
+            testing::assert_eq(
+                testing::expect_ok(index.location(at * 4), "location").column,
+                at * 2,
+            );
+            if at < count {
+                testing::assert(index.offset(0, at * 2 + 1).is_err());
+            }
+        }
+    }
+}
