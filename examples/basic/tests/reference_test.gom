@@ -1,7 +1,7 @@
 package tests;
 
 use ecosystem::verification::reference;
-use consumer::diagnostics as application;
+use ecosystem::diagnostics::examples::basic as application;
 use std::testing;
 use std::fs;
 use std::json;

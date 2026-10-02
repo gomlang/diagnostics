@@ -1,6 +1,6 @@
 package tests;
 
-use consumer::diagnostics as application;
+use ecosystem::diagnostics::examples::basic as application;
 use ecosystem::ansi;
 use ecosystem::diagnostics;
 use ecosystem::unicode_text;
