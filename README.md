@@ -7,12 +7,12 @@
 "ecosystem::diagnostics" = "0.1.0"
 ```
 
-```gom
+```goml
 use ecosystem::diagnostics;
 
 fn example() -> Result[string, diagnostics::Error] {
     let cache = diagnostics::SourceCache::new();
-    let file = cache.add("main.gom", "let value = old;\n")?;
+    let file = cache.add("main.goml", "let value = old;\n")?;
     let span = cache.span(file, 12, 15)?;
     let fix = diagnostics::Suggestion::new(
         "use the new name",
@@ -101,7 +101,7 @@ The example’s ordinary GoML test replays [independent reference vectors and na
 
 ## Development and examples
 
-Requires GoML 0.1.55 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires GoML 0.1.56 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic

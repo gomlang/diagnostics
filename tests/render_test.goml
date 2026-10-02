@@ -21,7 +21,7 @@ fn rendered(
 #[test]
 fn simple_diagnostic_has_exact_plain_layout() -> () {
     let cache = diagnostics::SourceCache::new();
-    let file = testing::expect_ok(cache.add("main.gom", "let value = old;\n"), "file");
+    let file = testing::expect_ok(cache.add("main.goml", "let value = old;\n"), "file");
     let report = diagnostics::Diagnostic::new(diagnostics::Severity::Error, "unknown name").with_code(
         "E001",
     ).with_label(diagnostics::Label::primary(span(cache, file, 12, 15), "not in scope")).with_note(
@@ -33,7 +33,7 @@ fn simple_diagnostic_has_exact_plain_layout() -> () {
     };
     testing::assert_eq(
         rendered(cache, report, options),
-        "error[E001]: unknown name\n --> main.gom:1:13\n1 |   let value = old;\n  |               ^^^ not in scope\n = note: names are case sensitive\n = help: declare old first\n",
+        "error[E001]: unknown name\n --> main.goml:1:13\n1 |   let value = old;\n  |               ^^^ not in scope\n = note: names are case sensitive\n = help: declare old first\n",
     );
 }
 
@@ -102,16 +102,16 @@ fn empty_eof_and_newline_only_spans_get_visible_carets() -> () {
 #[test]
 fn files_follow_cache_registration_order_and_primary_anchor() -> () {
     let cache = diagnostics::SourceCache::new();
-    let a = testing::expect_ok(cache.add("z.gom", "abc"), "a");
-    let b = testing::expect_ok(cache.add("a.gom", "xyz"), "b");
+    let a = testing::expect_ok(cache.add("z.goml", "abc"), "a");
+    let b = testing::expect_ok(cache.add("a.goml", "xyz"), "b");
     let report = diagnostics::Diagnostic::new(diagnostics::Severity::Note, "related sources").with_label(
         diagnostics::Label::primary(span(cache, b, 0, 1), "second file"),
     ).with_label(diagnostics::Label::secondary(span(cache, a, 0, 1), "earlier source")).with_label(
         diagnostics::Label::primary(span(cache, a, 2, 3), "anchor"),
     );
     let output = rendered(cache, report, diagnostics::RenderOptions::new());
-    let first = testing::expect_some(text::find(output, " --> z.gom:1:3"), "first");
-    let second = testing::expect_some(text::find(output, " --> a.gom:1:1"), "second");
+    let first = testing::expect_some(text::find(output, " --> z.goml:1:3"), "first");
+    let second = testing::expect_some(text::find(output, " --> a.goml:1:1"), "second");
     testing::assert(first < second);
 }
 

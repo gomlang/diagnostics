@@ -15,7 +15,7 @@ use std::testing;
 pub fn sample() -> string {
     let cache = diagnostics::SourceCache::new();
     let file = testing::expect_ok(
-        cache.add("src/main.gom", "fn main() {\n\tlet 世界 = old;\n}\n"),
+        cache.add("src/main.goml", "fn main() {\n\tlet 世界 = old;\n}\n"),
         "source",
     );
     let span = testing::expect_ok(cache.span(file, 26, 29), "span");

@@ -8,7 +8,7 @@ use std::testing;
 fn checked_spans_use_byte_boundaries_and_cache_identity() -> () {
     let cache = diagnostics::SourceCache::new();
     let other = diagnostics::SourceCache::new();
-    let file = testing::expect_ok(cache.add("unicode.gom", "中é👩‍💻"), "add");
+    let file = testing::expect_ok(cache.add("unicode.goml", "中é👩‍💻"), "add");
     testing::assert_eq(
         testing::expect_ok(cache.text(testing::expect_ok(cache.span(file, 0, 3), "span")), "text"),
         "中",
