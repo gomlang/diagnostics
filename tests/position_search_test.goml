@@ -1,0 +1,55 @@
+package tests;
+
+use ecosystem::diagnostics as diag;
+use ecosystem::unicode_text;
+use std::testing;
+use std::text;
+
+#[test]
+fn marker_endpoints_preserve_grapheme_rounding_at_absolute_byte_offsets() -> () {
+    let cache = diag::SourceCache::new();
+    let file = testing::expect_ok(cache.add("sample", "pre\r\nAé\t中👩‍💻z\r\n"), "source");
+    let source = testing::expect_ok(cache.get(file), "source");
+    let cases = Vec::from_array(
+        [
+            (0, 1, 0, 1),
+            (1, 2, 1, 1),
+            (2, 4, 1, 1),
+            (4, 5, 2, 2),
+            (5, 8, 4, 2),
+            (8, 12, 6, 2),
+            (12, 15, 6, 2),
+            (15, 19, 6, 2),
+            (19, 20, 8, 1),
+            (20, 20, 9, 1),
+            (20, 21, 9, 1),
+            (21, 22, 9, 1),
+        ],
+    );
+    let options = diag::RenderOptions { context_lines: 0, ..diag::RenderOptions::new() };
+    for (start, end, column, columns) in cases {
+        let location = testing::expect_ok(
+            source.location(5 + start, unicode_text::WidthOptions::new(), 4),
+            "location",
+        );
+        testing::assert_eq(location.line, 1);
+        testing::assert_eq(location.display_column, column);
+        let span = testing::expect_ok(source.span(5 + start, 5 + end), "span");
+        let report = diag::Diagnostic::new(diag::Severity::Error, "boundary").with_label(
+            diag::Label::primary(span, ""),
+        );
+        let rendered = testing::expect_ok(diag::render(cache, report, options), "render");
+        let expected = "error: boundary\n --> sample:2:" + (column + 1).to_string()
+            + "\n2 |   Aé  中👩‍💻z\n  |   "
+            + text::repeat(" ", column)
+            + text::repeat("^", columns)
+            + "\n";
+        testing::assert_eq(rendered, expected);
+    }
+    let eof = testing::expect_ok(
+        source.location(source.byte_len(), unicode_text::WidthOptions::new(), 4),
+        "EOF",
+    );
+    testing::assert_eq(eof.line, 2);
+    testing::assert_eq(eof.display_column, 0);
+}

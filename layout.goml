@@ -80,25 +80,26 @@ fn line_cells(line: SourceLine, width: unicode_text::WidthOptions, tab_stop: isi
 }
 
 fn column_at(cells: Vec[Cell], offset: isize, round_up: bool) -> isize {
-    for cell in cells {
-        if offset <= cell.start {
-            return cell.column;
-        }
-        if offset < cell.end {
-            return cell.column
-                + if round_up {
-                    cell.width
-                } else {
-                    0
-                };
+    let mut low = 0;
+    let mut high = cells.len();
+    while low < high {
+        let mid = low + (high - low) / 2;
+        if cells[mid].end <= offset {
+            low = mid + 1;
+        } else {
+            high = mid;
         }
     }
-    if cells.is_empty() {
-        0
-    } else {
-        let cell = cells[cells.len() - 1];
-        cell.column + cell.width
+    if low == cells.len() {
+        return cells_width(cells)
     }
+    let cell = cells[low];
+    cell.column
+        + if round_up && offset > cell.start {
+            cell.width
+        } else {
+            0
+        }
 }
 
 fn cells_width(cells: Vec[Cell]) -> isize {
