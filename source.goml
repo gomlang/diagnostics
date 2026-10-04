@@ -284,7 +284,7 @@ impl Source {
             if used > column {
                 return Result::Err(invalid);
             }
-            offset += scalar.to_string().byte_len();
+            offset += scalar_bytes(scalar);
         }
         if used == column {
             Result::Ok(offset)
