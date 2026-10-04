@@ -275,3 +275,98 @@ fn long_marker_rows_move_messages_to_a_separate_visible_row() -> () {
         testing::assert(unicode_text::width(line) <= options.columns);
     }
 }
+
+#[test]
+fn repeated_render_anchors_match_locations_across_lines_files_and_cache_identities() -> () {
+    for wide in Vec::from_array([false, true]) {
+        let options = diagnostics::RenderOptions {
+            width: unicode_text::WidthOptions { ambiguous_wide: wide, emoji_wide: wide },
+            tab_stop: if wide {
+                8
+            } else {
+                3
+            },
+            context_lines: 0,
+            ..diagnostics::RenderOptions::new(),
+        };
+        let renderer = testing::expect_ok(diagnostics::Renderer::new(options), "renderer");
+        for contents in Vec::from_array(["\t中é👩‍💻\r\nq", " abcdef01234567890\r\nq"]) {
+            let cache = diagnostics::SourceCache::new();
+            let first = testing::expect_ok(cache.add("first", contents), "first source");
+            let second = testing::expect_ok(cache.add("second", "\t·\nxy"), "second source");
+            let anchors = Vec::from_array(
+                [
+                    (first, 5),
+                    (first, 11),
+                    (first, 19),
+                    (first, 20),
+                    (first, 21),
+                    (second, 1),
+                    (second, 3),
+                    (second, 4),
+                    (second, 6),
+                    (first, 5),
+                ],
+            );
+            let mut report = diagnostics::Diagnostic::new(diagnostics::Severity::Note, "anchors").with_label(
+                diagnostics::Label::primary(span(cache, first, 5, 7), "cluster"),
+            );
+            for (file, offset) in anchors {
+                report = report.with_suggestion(
+                    diagnostics::Suggestion::new(
+                        "insert",
+                        diagnostics::Applicability::MaybeIncorrect,
+                    ).with_edit(diagnostics::Edit::new(span(cache, file, offset, offset), "new")),
+                );
+            }
+            let output = testing::expect_ok(renderer.render(cache, report), "render");
+            for (file, offset) in anchors {
+                let source = testing::expect_ok(cache.get(file), "source");
+                let location = testing::expect_ok(
+                    source.location(offset, options.width, options.tab_stop),
+                    "location",
+                );
+                testing::assert(
+                    output.contains(
+                        source.name()
+                            + f":{location.line + 1}:{location.display_column + 1}: replace bytes {offset}..{offset}\n",
+                    ),
+                );
+            }
+            testing::assert_eq(testing::expect_ok(renderer.render(cache, report), "repeat"), output);
+        }
+    }
+}
+
+#[test]
+fn render_line_reuse_preserves_limits_and_recovers_after_a_rejected_line() -> () {
+    let cache = diagnostics::SourceCache::new();
+    let short = testing::expect_ok(cache.add("short", "abc"), "short source");
+    let long = testing::expect_ok(cache.add("long", "abcd"), "long source");
+    let renderer = testing::expect_ok(
+        diagnostics::Renderer::new(
+            diagnostics::RenderOptions { max_line_bytes: 3, ..diagnostics::RenderOptions::new() },
+        ),
+        "renderer",
+    );
+    let valid = diagnostics::Diagnostic::new(diagnostics::Severity::Note, "limit").with_label(
+        diagnostics::Label::primary(span(cache, short, 0, 1), "short"),
+    );
+    let invalid = valid.with_suggestion(
+        diagnostics::Suggestion::new("edit", diagnostics::Applicability::MachineApplicable).with_edit(
+            diagnostics::Edit::new(span(cache, long, 0, 0), "new"),
+        ),
+    );
+    testing::assert_eq(
+        testing::expect_err(renderer.render(cache, invalid), "long line"),
+        diagnostics::Error::Limit("source line bytes"),
+    );
+    testing::assert_eq(
+        testing::expect_ok(renderer.render(cache, valid), "reuse"),
+        rendered(
+            cache,
+            valid,
+            diagnostics::RenderOptions { max_line_bytes: 3, ..diagnostics::RenderOptions::new() },
+        ),
+    );
+}

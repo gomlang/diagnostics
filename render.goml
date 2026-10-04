@@ -76,9 +76,16 @@ pub struct Renderer {
     options: RenderOptions,
 }
 
+struct MeasuredLine {
+    file: FileId,
+    number: isize,
+    cells: Vec[Cell],
+}
+
 struct Output {
     value: text::StringBuilder,
     options: RenderOptions,
+    recent_line: Ref[Option[MeasuredLine]],
 }
 
 struct OrderedLabel {
@@ -103,6 +110,35 @@ fn severity_style(theme: Theme, severity: Severity) -> ansi::Style {
 }
 
 impl Output {
+    fn cells(self: Output, source: Source, number: isize) -> Result[Vec[Cell], Error] {
+        let line = source.lines[number];
+        if line.text.byte_len() > self.options.max_line_bytes {
+            return Result::Err(Error::Limit("source line bytes"));
+        }
+        if let Some(previous) = self.recent_line.get() {
+            if previous.file == source.id && previous.number == number {
+                return Result::Ok(previous.cells);
+            }
+        }
+        let cells = line_cells(line, self.options.width, self.options.tab_stop);
+        self.recent_line.set(Option::Some(MeasuredLine { file: source.id, number, cells }));
+        Result::Ok(cells)
+    }
+
+    fn location(self: Output, source: Source, offset: isize) -> Result[Location, Error] {
+        source.span(offset, offset)?;
+        let number = line_at(source, offset);
+        let line = source.lines[number];
+        let cells = self.cells(source, number)?;
+        Result::Ok(
+            Location {
+                line: number,
+                byte_column: minimum(offset, line.end) - line.start,
+                display_column: column_at(cells, minimum(offset, line.end), false),
+            },
+        )
+    }
+
     fn line(self: Output, prefix: string, content: string, style: ansi::Style) -> Result[(), Error] {
         let columns = self.options.columns - unicode_text::width_with(prefix, self.options.width);
         let safe = clipped(content, maximum(columns, 0), self.options.width);
@@ -255,10 +291,7 @@ fn render_source_line(
 ) -> Result[(), Error] {
     let options = output.options;
     let line = source.lines[number];
-    if line.text.byte_len() > options.max_line_bytes {
-        return Result::Err(Error::Limit("source line bytes"));
-    }
-    let cells = line_cells(line, options.width, options.tab_stop);
+    let cells = output.cells(source, number)?;
     let total = cells_width(cells);
     let available = options.columns - digits - 7;
     let mut focus = 0;
@@ -361,10 +394,7 @@ fn render_file(
             break;
         }
     }
-    if source.lines[line_at(source, anchor)].text.byte_len() > options.max_line_bytes {
-        return Result::Err(Error::Limit("source line bytes"));
-    }
-    let location = source.location(anchor, options.width, options.tab_stop)?;
+    let location = output.location(source, anchor)?;
     let heading = clean_metadata(source.name)
         + f":{location.line + 1}:{location.display_column + 1}";
     output.line(" --> ", heading, options.theme.gutter)?;
@@ -452,7 +482,11 @@ impl Renderer {
         }
         let labels = ordered_labels(cache, report, options)?;
         let selected = selected_lines(cache, labels, options)?;
-        let output = Output { value: text::StringBuilder::new(), options };
+        let output = Output {
+            value: text::StringBuilder::new(),
+            options,
+            recent_line: Ref::new(Option::None),
+        };
         let code = report.code.map(|value| "[" + clean_metadata(value) + "]").unwrap_or("");
         output.line(
             "",
@@ -508,11 +542,7 @@ impl Renderer {
             for edit in suggestion.edits {
                 bounded_text(edit.replacement, options)?;
                 let source = cache.get(edit.span.file)?;
-                if source.lines[line_at(source, edit.span.start)].text.byte_len()
-                    > options.max_line_bytes {
-                    return Result::Err(Error::Limit("source line bytes"));
-                }
-                let position = source.location(edit.span.start, options.width, options.tab_stop)?;
+                let position = output.location(source, edit.span.start)?;
                 output.line(
                     "   ",
                     clean_metadata(source.name)
