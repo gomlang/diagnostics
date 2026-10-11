@@ -1,6 +1,6 @@
 package tests;
 
-use ecosystem::verification::reference;
+use ecosystem::testkit::reference;
 use ecosystem::diagnostics::examples::basic as application;
 use std::testing;
 use std::fs;
@@ -14,7 +14,7 @@ fn field(value: json::Value, name: string) -> json::Value {
 }
 
 fn reference_rows() -> Vec[json::Value] {
-    let source = reference::load_text("tests/data/reference.jsonl");
+    let source = reference::load_text(fixture_path("tests/data/reference.jsonl"));
     let rows = Vec::new();
     for line in source.split("\n") {
         if line != "" {
@@ -68,5 +68,13 @@ fn independent_source_locations_edits_and_render_properties() -> () {
                 + " label\n";
             testing::assert(plain.contains(expected_line));
         }
+    }
+}
+
+fn fixture_path(path: string) -> string {
+    if fs::is_dir("examples/basic") {
+        "examples/basic/" + path
+    } else {
+        path
     }
 }

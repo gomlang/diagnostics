@@ -94,7 +94,7 @@ All edit offsets refer to the original snapshots. Nonempty overlapping ranges ar
 ## Validation
 
 ```sh
-(cd ../verification && GOML_BUILD_JOBS=2 just ecosystem-test diagnostics)
+(cd ../workflows && GOML_BUILD_JOBS=2 just ecosystem-test diagnostics)
 ```
 
 The suite covers 29 library tests and 6 example tests: cache identity, malformed spans, UTF-16 surrogate boundaries, CRLF/CR/EOF, combining and emoji boundaries, tabs, overlapping and multiline labels, exact plain layouts, ANSI equivalence, custom themes, horizontal/vertical clipping, output limits, control injection, edit conflicts, final-size preflight, and immutable source revisions.
@@ -103,15 +103,15 @@ The example’s ordinary GoML test replays [independent reference vectors and na
 
 ## Development and examples
 
-Requires the [current GoML toolchain](https://github.com/gomlang/verification/blob/main/ci/toolchain.json) with unversioned registry support. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires the [current GoML toolchain](https://github.com/gomlang/workflows/blob/main/ci/toolchain.json) with unversioned registry support. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-(cd ../verification && just ecosystem-test diagnostics)
+(cd ../workflows && just ecosystem-test diagnostics)
 ```
 
-`goml test` builds the example and runs its tests. `(cd ../verification && just ecosystem-test diagnostics)` runs the library-specific smoke and compatibility checks.
+`goml test` builds the example and runs its tests. `(cd ../workflows && just ecosystem-test diagnostics)` runs the library-specific smoke and compatibility checks.
 
 `source.utf16_index()` builds an immutable `Utf16Index` for repeated editor
 queries. `index.location(byte_offset)` and `index.offset(line, utf16_column)`

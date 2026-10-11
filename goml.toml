@@ -6,4 +6,4 @@ path = "ecosystem::diagnostics"
 "ecosystem::unicode_text" = true
 
 [dev-dependencies]
-"ecosystem::verification" = true
+"ecosystem::testkit" = true
